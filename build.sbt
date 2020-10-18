@@ -4,6 +4,10 @@ version := "0.1"
 
 scalaVersion := "2.12.7"
 
+resourceDirectory in Compile := baseDirectory.value / "resources"
+
+libraryDependencies += "junit" % "junit" % "4.12"
+
 // https://mvnrepository.com/artifact/org.apache.spark/spark-core
 libraryDependencies += "org.apache.spark" %% "spark-core" % "2.4.0"
 // https://mvnrepository.com/artifact/org.apache.spark/spark-sql
@@ -17,3 +21,4 @@ libraryDependencies += "org.specs2" %% "specs2-core" % "3.8.6" % Test
 libraryDependencies ++= Seq(
   "com.typesafe" % "config" % "1.4.0"
 )
+
