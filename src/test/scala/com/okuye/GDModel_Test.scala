@@ -21,7 +21,9 @@ class GDModel_Test extends Specification {
 
 
 
+
   "3 should be the occurrence in the array arr1 " in {
+
     val arr1: Array[Int] = Array(2, 2, 3, 3, 2, 2, 3)
     getOddOccurrence(arr1) must be equalTo 3
   }
@@ -31,9 +33,16 @@ class GDModel_Test extends Specification {
     getOddOccurrence(arr2) must not equalTo 3
   }
 
-  "Read in a csv with multiple occurring numbers " in {
 
-     returnDataCount(fileOutputType,inputPath,aws_access_key_id,aws_secret_access_key) must be equalTo 5
+
+
+  "Write and Read in a csv with multiple occurring numbers " in {
+
+    val mainArray: Array[String] = Array(inputPath,outputPath,awsCredentialsPath)
+
+    Main.main(mainArray)
+
+    returnDataCount(fileOutputType,outputPath,aws_access_key_id,aws_secret_access_key) must be equalTo 5
   }
 
 }
