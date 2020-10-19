@@ -38,9 +38,9 @@ class GDModel_Test extends Specification {
 
   "Read in a csv with multiple occurring numbers " in {
 
-    val args = Array(inputPath.toString, outputPath.toString, resourcesPath.toString)
+    val args = Array("/Users/olakunlekuye/Dev/du-general-files/t2.tsv", "s3a://olakunlekuye/data", "/Users/olakunlekuye/.aws/credentials")
 
-    Main.main(args) must be equalTo 1
+    Main.main(args) must be equalTo 0
   }
 
 }

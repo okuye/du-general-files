@@ -1,53 +1,26 @@
 package com.okuye
 
+import org.apache.spark.sql
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 
 import scala.io.Source
 
 object GDModel {
 
 
+  lazy val spark: SparkSession = SparkSession.builder()
+    .master("local[1]")
+    .appName("okuye.com")
+    .getOrCreate()
 
-  val usage = """
+  val usage =
+    """
   Usage: parser [-i file] [-o file] [-c sopt] ...
   Where: -i I Set input file to I
          -f F Set output file to F
          -c C Set aws Credentials file to C
   """
 
-//  val spark: SparkSession = SparkSession
-//    .builder()
-//    .master("local[1]")
-//    .appName("okuye.com")
-//    .getOrCreate()
-//
-//  var gdSchema = StructType(
-//    Array(
-//      StructField("key", IntegerType, true),
-//      StructField("value", IntegerType, true)
-//    ))
-//
-//  //  def chooseDataType(opType:String,fullPath:String,header:Boolean, delimiter:String):DataFrame =  opType match {
-//  //    case  "csv" => getData(fullPath,",")
-//  //    case  "tab" => getData(fullPath,"\t")
-//  //  }
-//
-//  def getData1(fullPath: String, header: Boolean, delimiter: String) =
-//    spark.read
-//      .format("csv")
-//      . // Use "csv" regardless of TSV or CSV.
-//      option("header", header)
-//      . // Does the file have a header line?
-//      option("delimiter", delimiter)
-//      . // Set delimiter to tab or comma.
-//      schema(gdSchema)
-//      . // Schema that was built above.
-//      load(fullPath)
-
-//  def getData(fullPath: String, delimiter: String): Unit = {
-//    spark.read.option("sep", delimiter).csv(fullPath)
-//  }
 
   def getOddOccurrence(A: Array[Int]): Int = {
     val ar: Array[Int] = Array.ofDim[Int](A.toList.max + 1)
@@ -61,7 +34,7 @@ object GDModel {
     sys.exit(1)
   }
 
-  def getCredentials(credentialsPath: String): scala.collection.mutable.Map[String,String] = {
+  def getCredentials(credentialsPath: String): scala.collection.mutable.Map[String, String] = {
     // create an empty map
     var credentials = scala.collection.mutable.Map[String, String]()
     val list = Source.fromFile(credentialsPath).getLines().slice(1, 3).toList.map(_.split("="))
@@ -71,16 +44,101 @@ object GDModel {
     credentials
   }
 
-  def getFileType(path:String): String ={
-    val result = path.substring(path.lastIndexOf('.'))
+  def getFileType(path: String): String = {
+    val result = path.substring(path.lastIndexOf('.') + 1)
     result.toLowerCase
   }
 
-  def getDelimiter(extType:String):String= extType match {
+  def getDelimiter(extType: String): String = extType match {
     case "csv" => ","
     case "tsv" => "\t"
   }
 
 
+  def writeData(opType: String, inputPath: String, outputPath: String, aws_access_key_id: String, aws_secret_access_key: String): Unit = {
 
+
+    //Deteremine the extension type of the file
+    val extType = getDelimiter(getFileType(inputPath))
+
+    //Load a datafrane with the content of the file and replace all null values with 0
+    val segments = spark.read.option("sep", extType).option("header", "false").csv(inputPath)
+      .na.fill(0)
+
+    //Determine and emove the inconsistent header present in the data
+    val header = segments.first()
+
+    val tempDataNoHeader = segments.filter(line => line != header)
+
+    //Rename the inconsistent columns to key and value
+    val tempDataNoHeader_01 = tempDataNoHeader.withColumnRenamed(tempDataNoHeader.columns(0), "key")
+      .withColumnRenamed(tempDataNoHeader.columns(1), "value")
+    val tempDataNoHeader_02 = tempDataNoHeader_01.withColumn("key", tempDataNoHeader_01("key")
+      .cast(sql.types.IntegerType)).withColumn("value", tempDataNoHeader_01("value")
+      .cast(sql.types.IntegerType))
+
+    // Creates a temporary view using the DataFrame
+    tempDataNoHeader_02.createOrReplaceTempView("tempDataNoHeader_02")
+
+    //Determine the distint keys in the data
+    val distinctKeys = spark.sql("select distinct key from tempDataNoHeader_02")
+
+    //Drop the key column as is not required to filter the data
+    val tempDataNoHeader_03 = tempDataNoHeader_02.drop("key")
+
+    import spark.implicits._
+
+    //Create a collection to hold the key value pairs
+    var tempKeyValuesMap = scala.collection.mutable.Map[Int, Int]()
+
+    //Iterate over the distinct values in order to determine the odd occurrences in the main dataset
+    val tDa = distinctKeys.collect()
+    for (row <- tDa) {
+
+      //Get each unique key from the distinct keys in the data
+      val tempVal = row.getInt(0)
+
+      val keyFilteredData = tempDataNoHeader_03.filter("value = " + tempVal)
+
+      val keyFilteredDataArray = keyFilteredData.select("value").map(_.getInt(0)).collect()
+
+      //Create a map of a key and value that has odd occurences in the value column
+      tempKeyValuesMap += (tempVal -> getOddOccurrence(keyFilteredDataArray))
+
+
+    }
+
+
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.access.key", aws_access_key_id)
+    // Replace Key with your AWS secret key (You can find this on IAM
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.secret.key", aws_secret_access_key)
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.endpoint", "s3.amazonaws.com")
+
+    //Convert the collection into a dataframe to make saving easier
+    val df = tempKeyValuesMap.toSeq.toDF()
+
+    opType.toLowerCase match {
+      case "csv" =>
+        //Save the output to a directory
+        df.coalesce(1)
+          .write
+          .mode("overwrite")
+          .option("sep", ",")
+          .option("encoding", "UTF-8")
+          .csv(outputPath)
+      case "tsv" =>
+        //Save the output to a directory
+        df.coalesce(1)
+          .write
+          .mode("overwrite")
+          .option("sep", "\t")
+          .option("encoding", "UTF-8")
+          .csv(outputPath)
+      case _ => println("The options to save are either csv or tsv")
+
+    }
+  }
 }
