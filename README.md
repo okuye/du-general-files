@@ -10,6 +10,14 @@ For the getOddOccurrence function, I would have used one that made use of a Hash
 
 The simple approach I used, iterates over two loops and has a time complexity of O(n2).
 
+#Test Files
+The resources directory :
+
+t1.csv = Comma separated values  file
+t2.tsv = Tab separated value file
+
+application.conf = Holds the parameters need to run the application 
+
 
   
 
