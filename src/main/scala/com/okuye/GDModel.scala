@@ -58,35 +58,35 @@ object GDModel {
   //Return the count of data from an s3 directory
   def returnDataCount(opType: String, inputPath: String, aws_access_key_id: String, aws_secret_access_key: String): Long = {
 
-      spark.sparkContext
-        .hadoopConfiguration.set("fs.s3a.access.key", aws_access_key_id)
-      // Replace Key with your AWS secret key (You can find this on IAM
-      spark.sparkContext
-        .hadoopConfiguration.set("fs.s3a.secret.key", aws_secret_access_key)
-      spark.sparkContext
-        .hadoopConfiguration.set("fs.s3a.endpoint", "s3.amazonaws.com")
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.access.key", aws_access_key_id)
+    // Replace Key with your AWS secret key (You can find this on IAM
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.secret.key", aws_secret_access_key)
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.endpoint", "s3.amazonaws.com")
 
-      //Load a datafrane with the content of the file and return the count
-      val df = spark.read.option("sep", getDelimiter(opType)).option("header", "false").csv(inputPath)
+    //Load a datafrane with the content of the file and return the count
+    val df = spark.read.option("sep", getDelimiter(opType)).option("header", "false").csv(inputPath)
 
-      df.count()
+    df.count()
 
   }
 
   def writeData(opType: String, inputPath: String, outputPath: String, aws_access_key_id: String, aws_secret_access_key: String): Unit = {
-
     try {
+
       //Deteremine the extension type of the file
       val extType = getDelimiter(getFileType(inputPath))
 
       //Load a datafrane with the content of the file and replace all null values with 0
-      val segments = spark.read.option("sep", extType).option("header", "false").csv(inputPath)
+      val tempDF = spark.read.option("sep", extType).option("header", "false").csv(inputPath)
         .na.fill(0)
 
       //Determine and Remove the inconsistent header(s) present in the data
-      val header = segments.first()
+      val header = tempDF.first()
 
-      val tempDataNoHeader = segments.filter(line => line != header)
+      val tempDataNoHeader = tempDF.filter(line => line != header)
 
       //Rename the inconsistent columns to key and value
       val tempDataNoHeader_01 = tempDataNoHeader.withColumnRenamed(tempDataNoHeader.columns(0), "key")
@@ -162,5 +162,6 @@ object GDModel {
     catch {
       case e: Exception => e.printStackTrace
     }
+
   }
 }
