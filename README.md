@@ -10,7 +10,9 @@ For the getOddOccurrence function , I would have used one that made use of a Has
  
 array elements as a key and their counts as value. Traversing given elements in an array, storing 
 
-the counts , although this requires extra space for hashing .
+the counts , although this requires extra space for hashing , although and has a time complexity of O(n).
+
+The simple approach I used , iterates over two loops and has a time complexity of O(n2).
 
   
 
