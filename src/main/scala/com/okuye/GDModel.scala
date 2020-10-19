@@ -29,6 +29,7 @@ object GDModel {
     -1
   }
 
+  //Use this to shut the application down if all the required parameters are not supplied
   def die(msg: String = usage) = {
     println(msg)
     sys.exit(1)
@@ -54,6 +55,22 @@ object GDModel {
     case "tsv" => "\t"
   }
 
+  //Return the count of data from an s3 directory
+  def returnDataCount(opType: String, inputPath: String, aws_access_key_id: String, aws_secret_access_key: String): Long = {
+
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.access.key", aws_access_key_id)
+    // Replace Key with your AWS secret key (You can find this on IAM
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.secret.key", aws_secret_access_key)
+    spark.sparkContext
+      .hadoopConfiguration.set("fs.s3a.endpoint", "s3.amazonaws.com")
+
+    //Load a datafrane with the content of the file and return the count
+    val df = spark.read.option("sep", getDelimiter(opType)).option("header", "false").csv(inputPath)
+
+    df.count()
+  }
 
   def writeData(opType: String, inputPath: String, outputPath: String, aws_access_key_id: String, aws_secret_access_key: String): Unit = {
 
@@ -65,7 +82,7 @@ object GDModel {
     val segments = spark.read.option("sep", extType).option("header", "false").csv(inputPath)
       .na.fill(0)
 
-    //Determine and emove the inconsistent header present in the data
+    //Determine and Remove the inconsistent header(s) present in the data
     val header = segments.first()
 
     val tempDataNoHeader = segments.filter(line => line != header)
